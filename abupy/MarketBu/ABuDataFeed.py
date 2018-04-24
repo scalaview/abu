@@ -22,7 +22,7 @@ from ..CoreBu import ABuEnv
 from ..MarketBu import ABuNetWork
 from ..MarketBu.ABuDataBase import StockBaseMarket, SupportMixin, FuturesBaseMarket, TCBaseMarket
 from ..MarketBu.ABuDataParser import BDParser, TXParser, NTParser, SNUSParser
-from ..MarketBu.ABuDataParser import SNFuturesParser, SNFuturesGBParser, HBTCParser
+from ..MarketBu.ABuDataParser import SNFuturesParser, SNFuturesGBParser, HBTCParser, HProBTCParser
 from ..UtilBu import ABuStrUtil, ABuDateUtil, ABuMd5
 from ..UtilBu.ABuDTUtil import catch_error
 from ..CoreBu.ABuDeprecated import AbuDeprecated
@@ -440,3 +440,74 @@ class HBApi(TCBaseMarket, SupportMixin):
     def minute(self, *args, **kwargs):
         """分钟k线接口"""
         raise NotImplementedError('HBApi minute NotImplementedError!')
+
+
+class HBProApi(TCBaseMarket, SupportMixin):
+    """hb数据源，支持币类，比特币，莱特币"""
+
+    K_NET_BASE = 'https://api.huobi.pro/market/history/kline'
+
+    def __init__(self, symbol):
+        """
+        :param symbol: Symbol类型对象
+        """
+        super(HBProApi, self).__init__(symbol)
+        # 设置数据源解析对象类
+        self.data_parser_cls = HProBTCParser
+
+    def _support_market(self):
+        """只支持币类市场"""
+        return [EMarketTargetType.E_MARKET_TARGET_TC]
+
+    def kline(self, n_folds=2, start=None, end=None):
+        """日k线接口"""
+        req_cnt = n_folds * ABuEnv.g_market_trade_year
+        if start is not None and end is not None:
+            # 向上取整数，下面使用_fix_kline_pd再次进行剪裁, 要使用current_str_date不能是end
+            folds = math.ceil(ABuDateUtil.diff(ABuDateUtil.date_str_to_int(start),
+                                               ABuDateUtil.current_str_date()) / 365)
+            req_cnt = folds * ABuEnv.g_market_trade_year
+        params = {'symbol': "btcusdt",
+              'period': "1day",
+              'size': 2000}
+        url = HBProApi.K_NET_BASE
+        data = HBProApi.http_get_request(url, params)
+        kl_df = self.data_parser_cls(self._symbol, data).df
+        if kl_df is None:
+            return None
+        return TCBaseMarket._fix_kline_pd(kl_df, n_folds, start, end)
+
+    def minute(self, *args, **kwargs):
+        """分钟k线接口"""
+        raise NotImplementedError('HBApi minute NotImplementedError!')
+
+    @staticmethod
+    def http_get_request(url, params, add_to_headers=None):
+        import base64
+        import datetime
+        import hashlib
+        import hmac
+        import json
+        import urllib
+        import urllib.parse
+        import urllib.request
+        import requests
+        headers = {
+            "Content-type": "application/x-www-form-urlencoded",
+            'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36',
+        }
+        if add_to_headers:
+            headers.update(add_to_headers)
+        postdata = urllib.parse.urlencode(params)
+        print(url)
+        print(postdata)
+        response = requests.get(url, postdata, headers=headers, timeout=5)
+        try:
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return
+        except BaseException as e:
+            print("httpGet failed, detail is:%s,%s" %(response.text,e))
+            return

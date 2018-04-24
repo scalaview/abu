@@ -14,6 +14,7 @@ from datetime import datetime as dt
 from ..CoreBu.ABuFixes import six
 # noinspection PyUnresolvedReferences
 from ..CoreBu.ABuFixes import filter
+fromtimestamp = dt.fromtimestamp
 
 try:
     # 如果有安装dateutil使用relativedelta as timedelta
@@ -164,7 +165,10 @@ def fmt_date(convert_date):
             convert_date = "%s-0%s-0%s" % (convert_date[0:4],
                                            convert_date[4:5], convert_date[5:6])
         else:
-            raise ValueError('fmt_date: convert_date fmt error {}'.format(convert_date))
+            try:
+                convert_date = fromtimestamp(int(convert_date)).strftime("%Y-%m-%d")
+            except Exception as e:
+                raise ValueError('fmt_date: convert_date fmt error {0}, {1}'.format(convert_date, e))
     return convert_date
 
 
