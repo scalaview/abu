@@ -7,3 +7,7 @@ p.sh
 tmp
 test.py
 /abupy/RomDataBu/df_kl.h5
+bin/
+include/
+lib/
+pip-selfcheck.json
